@@ -1,4 +1,10 @@
 const videoContainer = document.getElementById("videoContainer")
+const canvasSize = {
+    width: videoContainer.width,
+    height: videoContainer.height
+};
+
+
 function loadWebcam(){
     let video = videoContainer
 
@@ -10,6 +16,42 @@ function loadWebcam(){
     }
 }
 
+async function captureVideo(){
+    let detections;
+    let resizeCanvas;
+    let arrayDescriptor;
+    let canvas = faceapi.createCanvasFromMedia(videoContainer);
+
+    faceapi.matchDimensions(canvas, canvasSize);
+    document.body.append(canvas);
+    setInterval(async () => {
+        detections = await faceapi.detectSingleFace(
+            videoContainer,
+            new faceapi.TinyFaceDetectorOptions()
+        )
+        .withFaceLandmarks()
+        .withFaceDescriptor()
+        
+        resizeCanvas = faceapi.resizeResults(detections, canvasSize);
+        console.log(resizeCanvas);
+        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+        faceapi.draw.drawDetections(canvas, resizeCanvas);
+        arrayDescriptor = await loadFace();
+        
+        console.log(faceapi.euclideanDistance(arrayDescriptor, detections.descriptor));
+    }, 100)
+}
+
+async function loadFace(){
+    const image = await faceapi.fetchImage("/db/WIN_20200531_15_28_18_Pro.jpg");
+    const detections = await faceapi.detectSingleFace(image)
+    .withFaceLandmarks()
+    .withFaceDescriptor()
+
+    return detections.descriptor;
+}
+
+
 Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
     faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
@@ -18,27 +60,4 @@ Promise.all([
     faceapi.nets.faceExpressionNet.loadFromUri('/models')
 ]).then(loadWebcam)
 
-videoContainer.addEventListener('play', async () =>{
-    const canvas = faceapi.createCanvasFromMedia(videoContainer);
-    const canvasSize = {
-        width: videoContainer.width,
-        height: videoContainer.height
-    }
-    faceapi.matchDimensions(canvas, canvasSize);
-    document.body.append(canvas);
-    setInterval(async () => {
-        const detections = await faceapi.detectSingleFace(
-            videoContainer,
-            new faceapi.TinyFaceDetectorOptions()
-        )
-        .withFaceLandmarks()
-        .withFaceExpressions()
-        
-        const resizeCanvas = faceapi.resizeResults(detections, canvasSize)
-        canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height)
-        faceapi.draw.drawDetections(canvas, resizeCanvas)
-        faceapi.draw.drawFaceLandmarks(canvas, resizeCanvas)
-        faceapi.draw.drawFaceExpressions(canvas, resizeCanvas)
-
-    }, 100)
-});
+videoContainer.addEventListener('play', captureVideo)
